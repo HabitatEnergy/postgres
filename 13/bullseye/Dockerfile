@@ -180,9 +180,19 @@ RUN set -eux; \
 	cp -v /usr/share/postgresql/postgresql.conf.sample.dpkg /usr/share/postgresql/postgresql.conf.sample; \
 	ln -sv ../postgresql.conf.sample "/usr/share/postgresql/$PG_MAJOR/"; \
 	sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" /usr/share/postgresql/postgresql.conf.sample; \
+	sed -ri "s/^#shared_preload_libraries.*/shared_preload_libraries = 'pg_cron'/" /usr/share/postgresql/postgresql.conf.sample; \
+	grep -q "^cron.database_name" /usr/share/postgresql/postgresql.conf.sample || echo "cron.database_name = 'habitat_test'" >> /usr/share/postgresql/postgresql.conf.sample; \
 	grep -F "listen_addresses = '*'" /usr/share/postgresql/postgresql.conf.sample
 
 RUN install --verbose --directory --owner postgres --group postgres --mode 3777 /var/run/postgresql
+
+RUN set -ex; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        postgresql-13-partman \
+		postgresql-13-cron \
+    ; \
+    rm -rf /var/lib/apt/lists/*
 
 ENV PGDATA /var/lib/postgresql/data
 # this 1777 will be replaced by 0700 at runtime (allows semi-arbitrary "--user" values)
