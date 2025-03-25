@@ -227,12 +227,32 @@ docker_setup_db() {
 		EOSQL
 		printf '\n'
 	fi
+	# Create postgres role if it does not exist
+    if [ -n "${POSTGRESQL_POSTGRES_PASSWORD:-}" ]; then
+        local postgresRoleExists
+        postgresRoleExists="$(docker_process_sql --dbname postgres --tuples-only <<-'EOSQL'
+            SELECT 1 FROM pg_roles WHERE rolname = 'postgres';
+		EOSQL
+        )"
+        if [ -z "$postgresRoleExists" ]; then
+            docker_process_sql --dbname postgres <<-EOSQL
+                CREATE ROLE postgres WITH SUPERUSER LOGIN PASSWORD '${POSTGRESQL_POSTGRES_PASSWORD}';
+		EOSQL
+        else
+            docker_process_sql --dbname postgres <<-EOSQL
+                ALTER USER postgres PASSWORD '${POSTGRESQL_POSTGRES_PASSWORD}';
+		EOSQL
+        fi
+    fi
 }
 
 # Loads various settings that are used elsewhere in the script
 # This should be called before any other functions
 docker_setup_env() {
 	file_env 'POSTGRES_PASSWORD'
+
+	# Handle POSTGRESQL_POSTGRES_PASSWORD as a priority for the postgres superuser
+	file_env 'POSTGRESQL_POSTGRES_PASSWORD'
 
 	file_env 'POSTGRES_USER' 'postgres'
 	file_env 'POSTGRES_DB' "$POSTGRES_USER"
